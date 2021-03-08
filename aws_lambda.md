@@ -213,6 +213,59 @@ layers:
 
 배포된 Lambda는 aws console에서 확인이 가능하다.
 ![](https://i.imgur.com/QAV8QSs.png)
-![](https://i.imgur.com/tuksaXw.png)
+![](https://i.imgur.com/I4JYeOy.png)
 local에서 구성한 handle.js와 똑같은 소스 코드로 구성된다.
-![](https://i.imgur.com/ZPae0KE.png)
+![](https://i.imgur.com/ZPae0KE.png)  
+
+## lambda에 API Gateway 트리거 추가
+trigger = '발동', lambda 함수 자체는 혼자서 실행될 수 없기 때문에 트리거가 필요하다. AWS API Gateway를 통해 웹 요청이 들어왔을때, lambda가 실행되도록 처리  
+![](https://i.imgur.com/6i9Z1pC.png)  
+
+생성된 default 스테이지에서 볼수 있는 URL + endpoint를 추가하여 insomnia에서 GET 테스트  
+![](https://i.imgur.com/xAqOK9d.png)  
+
+## 트리거를 추가를 serverless에서 설정
+Gateway 트리거 추가는 serverless.yml에서도 설정을 추가해서 배포하면 추가적인 리소스생성이 가능하다. [serverless docs: AWS - events 참조](https://www.serverless.com/framework/docs/providers/aws/guide/events/)
+
+기존의 serverless.yml의 `functions`부분을 다음과 같이 구성한다. hello/get의 path로 게이트웨이가 생성되고 GET요청이 가능하다.
+```yml
+functions:
+  hello:
+    handler: handler.hello
+    events:
+    - http:
+        path: hello/get
+        method: get
+```
+
+기존의 helloworld 프로젝트를 재배포한다. 재배포시 로그에 endpoints 내용이 남고, 해당 URL을 호출가능하다.
+```shell
+$ sls deploy -s test -r ap-northeast-2
+Serverless: Packaging service...
+Serverless: Excluding development dependencies...
+Serverless: Uploading CloudFormation file to S3...
+Serverless: Uploading artifacts...
+Serverless: Uploading service helloworld.zip file to S3 (569 B)...
+Serverless: Validating template...
+Serverless: Updating Stack...
+Serverless: Checking Stack update progress...
+.......................
+Serverless: Stack update finished...
+Service Information
+service: helloworld
+stage: test
+region: ap-northeast-2
+stack: helloworld-test
+resources: 12
+api keys:
+  None
+endpoints:
+  GET - https://s3tkqlsq2g.execute-api.ap-northeast-2.amazonaws.com/test/hello/get
+functions:
+  hello: helloworld-test-hello
+layers:
+  None
+```
+
+생성된 URL로 insomnia를 통해 GET 요청
+![](https://i.imgur.com/qj8Knqd.png)
