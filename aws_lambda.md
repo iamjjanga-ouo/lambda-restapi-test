@@ -84,3 +84,135 @@ aws console을 이용해서, serverless를 이용해서 둘다 생성이 가능�
 
 ## serverless 프레임워크로 lambda 만들기
 - `serverless create` 명령으로 프로젝트 생성할 수 있으며, `--template` 옵션을 적용하면 해당 언어의 기본 코드를 갖춘 프로젝트로 생성할 수 있다.
+
+```shell
+$ serverless create --template aws-nodejs --path helloworld --name helloworld
+# 또는 줄여서
+$ sls create -t aws-nodejs -p helloworld -n helloworld
+```
+
+### helloworld 프로젝트 생성
+```shell
+$ sls create -t aws-nodejs -p helloworld -n helloworld
+Serverless: Generating boilerplate...
+Serverless: Generating boilerplate in "/Users/leesihyung/Workspace/serverless/helloworld"
+ _______                             __
+|   _   .-----.----.--.--.-----.----|  .-----.-----.-----.
+|   |___|  -__|   _|  |  |  -__|   _|  |  -__|__ --|__ --|
+|____   |_____|__|  \___/|_____|__| |__|_____|_____|_____|
+|   |   |             The Serverless Application Framework
+|       |                           serverless.com, v2.31.0
+ -------'
+
+Serverless: Successfully generated boilerplate for template: "aws-nodejs"
+```
+
+생성이 완료되면 다음과 같은 프로젝트 구조를 가진다.
+```shell
+$ tree -L 2 helloworld
+helloworld
+├── handler.js
+└── serverless.yml
+```
+
+### handle.js
+- `module.exports.hello = async event => {};` 내부에 자동으로 기본코드가 작성. 해당부분을 수정하여 로직을 구성하면된다.
+
+```js
+'use strict';
+
+module.exports.hello = async (event) => {
+  return {
+    statusCode: 200,
+    body: JSON.stringify(
+      {
+        message: 'Go Serverless v1.0! Your function executed successfully!',
+        input: event,
+      },
+      null,
+      2
+    ),
+  };
+
+  // Use this code if you don't use the http event with the LAMBDA-PROXY integration
+  // return { message: 'Go Serverless v1.0! Your function executed successfully!', event };
+};
+```
+
+### serverless.yml
+자동 생성 내용중 주석을 제거하면 다음과 같다. function 이름은 기본으로 hello로 설정되므로 변경이 필요하다.  
+필요하면 아래의 `functions`에서 hello를 다른이름으로 변경하고 handle.js에서 `module.exports.hello`의 hello를 다른이름으로 변경하면 된다.
+
+```yaml
+service: helloworld
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  lambdaHashingVersion: 20201221
+
+functions:
+  hello:
+    handler: handler.hello
+```
+
+## 로컬에서 코드 실행
+위의 코드를 로컬에서 테스트하기 위해서는 아래와 같은 명령어로 실행
+
+- `serverless invoke [환경명] -f [function 명]`
+
+```shell
+$ sls invoke local -f hello
+{
+    "statusCode": 200,
+    "body": "{\n  \"message\": \"Go Serverless v1.0! Your function executed successfully!\",\n  \"input\": \"\"\n}"
+}
+```
+
+## aws에 프로젝트 배포
+`serverless deploy` 명령으로 aws Lambda 서비스에 배포할 수 있다. `-stage`에는 배포할 환경, `-region`에는 배포할 리전을 지정한다. region의 경우 serverless.yml에 설정해주면 생략이 가능하다.
+
+```shell
+$ serverless deploy --stage test --region ap-northeast-2
+```
+
+다음과 같이 축약도 가능하다.
+```shell
+$ sls deploy -s test -r ap-northeast-2
+Serverless: Packaging service...
+Serverless: Excluding development dependencies...
+Serverless: Creating Stack...
+Serverless: Checking Stack create progress...
+........
+Serverless: Stack create finished...
+Serverless: Uploading CloudFormation file to S3...
+Serverless: Uploading artifacts...
+Serverless: Uploading service helloworld.zip file to S3 (569 B)...
+Serverless: Validating template...
+Serverless: Updating Stack...
+Serverless: Checking Stack update progress...
+...............
+Serverless: Stack update finished...
+Service Information
+service: helloworld
+stage: test
+region: ap-northeast-2
+stack: helloworld-test
+resources: 6
+api keys:
+  None
+endpoints:
+  None
+functions:
+  hello: helloworld-test-hello
+layers:
+  None
+```
+
+배포된 Lambda는 aws console에서 확인이 가능하다.
+![](https://i.imgur.com/QAV8QSs.png)
+![](https://i.imgur.com/tuksaXw.png)
+local에서 구성한 handle.js와 똑같은 소스 코드로 구성된다.
+![](https://i.imgur.com/ZPae0KE.png)
