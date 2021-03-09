@@ -269,3 +269,238 @@ layers:
 
 생성된 URL로 insomnia를 통해 GET 요청
 ![](https://i.imgur.com/qj8Knqd.png)
+
+# node package 설치
+
+## node 초기화
+
+node 모듈을 설치하고 사용하려면 초기화가 필요하다. 프로젝터 디렉터리에서 `npm init` 명령을 실행.
+```shell
+$  npm init -y
+Wrote to /Users/leesihyung/Workspace/serverless/helloworld/package.json:
+
+{
+  "name": "helloworld",
+  "version": "1.0.0",
+  "description": "",
+  "main": "handler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+```
+
+명령 수행 후 프로젝터 디렉터리 하위에 pacakge관련 파일이 생성된다.
+```
+helloworld
+├── handler.js
+├── package.json
+└── serverless.yml
+```
+
+## package 설치
+사용하고자하는 모듈은 `npm install` 명령으로 설치가 가능. 테스트는 redis, mysql, http 관련 모듈로 진행 (!!! helloworld 디렉터리 하위에서 진행한다.)
+```shell
+$ npm i redis
+$ npm i mysql
+$ npm i http
+```
+
+## Local db 구성
+redis와 mysql은 로컬 docker container환경에서 테스트를 진행한다. `docker-compose`를 통해 각각의 container를 생성한다.  
+
+### docker-compose를 통해 redis, mariadb container 구성
+db_instances.yml
+```yaml
+version: '3.7'
+services:
+    redis:
+      # redis stanalone
+      image: redis:6.0.5
+      command: redis-server --port 6379 --appendonly yes
+      container_name: redis6379
+      hostname: redis6379
+      labels:
+        - "name=redis"
+        - "mode=standalone"
+      ports:
+        - 6379:6379
+      volumes:
+        - ./db_data/redis/data:/data
+
+    # mariadb stanalone
+    mariadb:
+      image: mariadb:10.2.10
+      container_name: maria3306
+      hostname: maria3306
+      restart: always
+      labels:
+        - "name=mariadb"
+        - "mode=standalone"
+      environment:
+        - MYSQL_ROOT_PASSWORD=mypassword
+      ports:
+        - 3306:3306
+      volumes:
+        - ./db_data/mariadb/data:/var/lib/mysql
+```
+- `ports` : 호스트OS에 포트매핑을 통해 호스트의 localhost로 접근이 가능하다.
+- `volumes` : container가 예기치 못한 상황으로 중단되거나 종료되더라도 db 데이터 백업을 하는 Volume을 연결해둔다. (여기서는 container 생성시마다 테스트 데이터의 백업용으로 사용하였다.)
+
+다음 명령어로 container를 시작한다. (위치는 db_instance.yml이 위치한 디렉터리에서 실행한다.)
+```shell
+$ docker-compose -f ./docker_code/db_instances.yml up -d
+```
+
+정상적으로 올라왔는지 확인
+```shell
+$ docker ps
+CONTAINER ID   IMAGE             COMMAND                  CREATED          STATUS          PORTS                    NAMES
+a106377ad963   redis:6.0.5       "docker-entrypoint.s…"   13 minutes ago   Up 13 minutes   0.0.0.0:6379->6379/tcp   redis6379
+b6b13f9c6ac1   mariadb:10.2.10   "docker-entrypoint.s…"   13 minutes ago   Up 13 minutes   0.0.0.0:3306->3306/tcp   maria3306
+```
+
+## redis, mysql, http 테스트 handler 구성
+redis, mysql, http function을 하나씩 생성하고 동작을 확인하는 간단한 프로그램입니다. node.js는 이벤트 기반, Non-blocking I/O 모델이므로 예제에는 `promise`와 `await`를 사용하여 비동기 방식으로 로직을 처리하도록 하였습니다.
+
+```js
+'use strict';
+
+// 사용할 모듈 선언
+const redis = require('redis');
+const mysql = require('mysql');
+const http = require('http');
+
+// REDIS에 데이터를 set한 후 get하는 예제
+function setGetByRedis() {
+  return new Promise((resolve, reject) => {
+    // Redis
+    const redis_client = redis.createClient({
+      host: "localhost", 
+      port: 6379
+    });
+    redis_client.set('lambda','Hello Lambda', (err, result) => {
+      if(result)
+        console.log("redis-set-result:",result);
+        
+      if(err)
+        console.log("redis-set-error:",err);
+    });
+    redis_client.get('lambda', (err, result) => { 
+      if(result)
+        resolve(result);
+      
+      if(err)
+        console.log("redis-get-error:",err);
+    });
+    redis_client.quit();
+  });
+}
+
+// MYSQL 테이블에서 데이터를 5개 조회하는 예제
+function getCommentByDB() {
+  return new Promise((resolve, reject) => {
+    // Mysql
+    const mysql_connection = mysql.createConnection({
+      host: 'localhost',
+      port: 3306,
+      user: 'root',
+      password: 'mypassword',
+      database: 'test_db'
+    });
+
+    mysql_connection.connect();
+    mysql_connection.query('select * from users order by id limit 5', function(err, result, field) {
+        if(result)
+          resolve(result);
+        
+        if(err)
+          console.log("db-error:",err);
+    });
+    mysql_connection.end();
+  });
+}
+
+// REST API를 호출하고 결과 JSON을 읽어서 화면에 출력하는 예제
+function getUsersByHttp() {
+  return new Promise((resolve, reject) => {
+    const options = {
+      host: 'jsonplaceholder.typicode.com',
+      port: 80,
+      path: '/users',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+    const request = http.request(options, function(response) {
+      let body = '';
+      response.on('data', function(data) {
+        body += data;
+      })
+      response.on('end', function() {
+        resolve(JSON.parse(body));
+      });
+      response.on('error', function(err) {
+        console.log("http-error:",err);
+      }); 
+    });
+    request.end();
+  });
+}
+
+module.exports.hello = async event => {
+  const redisResult = await setGetByRedis();
+  console.log("1. REDIS RESULT");
+  console.log(redisResult);
+
+  const dbResult = await getCommentByDB();
+  console.log("2. DB RESULT");
+  if(dbResult) {
+    dbResult.forEach(user => {
+      console.log("id = %d, firstname = %s, lastname = %s, email = %s", user.id, user.first_name, user.last_name, user.email);
+    });
+  }
+  
+  const httpResult = await getUsersByHttp();
+  console.log("3. HTTP RESULT");
+  if(httpResult) {
+    httpResult.forEach(user => {
+      console.log("id = %d, name = %s, email = %s", user.id, user.name, user.email);
+    });
+  }
+};
+```
+
+local에서 handler를 실행하면 아래와 같은 데이터가 출력됩니다. http의 API test data는 fake API인 [jsonplace](http://jsonplaceholder.typicode.com/)를 가져오는 방식입니다. jsonplace에 /users endpoint를 조회하면 10명의 user정보에 대해 확인할 수 있습니다.  
+```shell
+$  sls invoke local -f hello
+redis-set-result: OK
+1. REDIS RESULT
+Hello Lambda
+2. DB RESULT
+id = 1, firstname = Fred, lastname = Smith, email = fred@gmail.com
+id = 2, firstname = Sara, lastname = Watson, email = sara@gmail.com
+id = 3, firstname = Will, lastname = Jackson, email = will@yahoo.com
+id = 4, firstname = Paula, lastname = Johnson, email = paula@yahoo.com
+id = 5, firstname = Tom, lastname = Spears, email = tom@yahoo.com
+3. HTTP RESULT
+id = 1, name = Leanne Graham, email = Sincere@april.biz
+id = 2, name = Ervin Howell, email = Shanna@melissa.tv
+id = 3, name = Clementine Bauch, email = Nathan@yesenia.net
+id = 4, name = Patricia Lebsack, email = Julianne.OConner@kory.org
+id = 5, name = Chelsey Dietrich, email = Lucio_Hettinger@annie.ca
+id = 6, name = Mrs. Dennis Schulist, email = Karley_Dach@jasper.info
+id = 7, name = Kurtis Weissnat, email = Telly.Hoeger@billy.biz
+id = 8, name = Nicholas Runolfsdottir V, email = Sherwood@rosamond.me
+id = 9, name = Glenna Reichert, email = Chaim_McDermott@dana.io
+id = 10, name = Clementina DuBuque, email = Rey.Padberg@karina.biz
+```
+
+
+# Refs.
+- [redis container 관련](https://gblee1987.tistory.com/158)
+- [mysql test data & cheat sheet](https://gist.github.com/bradtraversy/c831baaad44343cc945e76c2e30927b3)
