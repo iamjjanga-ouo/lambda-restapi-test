@@ -1,3 +1,35 @@
+# Index
+- [Index](#index)
+- [Local 개발 환경 설정](#local-개발-환경-설정)
+  - [Node.js 설치](#nodejs-설치)
+  - [awscli 설치](#awscli-설치)
+  - [aws IAM 인증 설정](#aws-iam-인증-설정)
+  - [Serverless Framework 설치](#serverless-framework-설치)
+  - [awslogs 설치](#awslogs-설치)
+    - [설치](#설치)
+    - [로그확인](#로그확인)
+- [Hello lambda로 테스트](#hello-lambda로-테스트)
+  - [serverless 프레임워크로 lambda 만들기](#serverless-프레임워크로-lambda-만들기)
+    - [helloworld 프로젝트 생성](#helloworld-프로젝트-생성)
+    - [handle.js](#handlejs)
+    - [serverless.yml](#serverlessyml)
+  - [로컬에서 코드 실행](#로컬에서-코드-실행)
+  - [aws에 프로젝트 배포](#aws에-프로젝트-배포)
+  - [lambda에 API Gateway 트리거 추가](#lambda에-api-gateway-트리거-추가)
+  - [트리거를 추가를 serverless에서 설정](#트리거를-추가를-serverless에서-설정)
+- [node package 설치](#node-package-설치)
+  - [node 초기화](#node-초기화)
+  - [package 설치](#package-설치)
+  - [Local db 구성](#local-db-구성)
+    - [docker-compose를 통해 redis, mariadb container 구성](#docker-compose를-통해-redis-mariadb-container-구성)
+  - [redis, mysql, http 테스트 handler 구성](#redis-mysql-http-테스트-handler-구성)
+  - [function 모듈화](#function-모듈화)
+    - [redis_module.js](#redis_modulejs)
+    - [db_module.js](#db_modulejs)
+    - [http_module.js](#http_modulejs)
+    - [handler.js](#handlerjs)
+- [Refs.](#refs)
+
 # Local 개발 환경 설정
 ## Node.js 설치
 작성일 기준 AWS Lambda 개발시 node.js 12.x를 권장. homebrew를 통해 설치하고 node path를 등록한 후 버전을 확인한다.
@@ -478,6 +510,168 @@ module.exports.hello = async event => {
 local에서 handler를 실행하면 아래와 같은 데이터가 출력됩니다. http의 API test data는 fake API인 [jsonplace](http://jsonplaceholder.typicode.com/)를 가져오는 방식입니다. jsonplace에 /users endpoint를 조회하면 10명의 user정보에 대해 확인할 수 있습니다.  
 ```shell
 $  sls invoke local -f hello
+redis-set-result: OK
+1. REDIS RESULT
+Hello Lambda
+2. DB RESULT
+id = 1, firstname = Fred, lastname = Smith, email = fred@gmail.com
+id = 2, firstname = Sara, lastname = Watson, email = sara@gmail.com
+id = 3, firstname = Will, lastname = Jackson, email = will@yahoo.com
+id = 4, firstname = Paula, lastname = Johnson, email = paula@yahoo.com
+id = 5, firstname = Tom, lastname = Spears, email = tom@yahoo.com
+3. HTTP RESULT
+id = 1, name = Leanne Graham, email = Sincere@april.biz
+id = 2, name = Ervin Howell, email = Shanna@melissa.tv
+id = 3, name = Clementine Bauch, email = Nathan@yesenia.net
+id = 4, name = Patricia Lebsack, email = Julianne.OConner@kory.org
+id = 5, name = Chelsey Dietrich, email = Lucio_Hettinger@annie.ca
+id = 6, name = Mrs. Dennis Schulist, email = Karley_Dach@jasper.info
+id = 7, name = Kurtis Weissnat, email = Telly.Hoeger@billy.biz
+id = 8, name = Nicholas Runolfsdottir V, email = Sherwood@rosamond.me
+id = 9, name = Glenna Reichert, email = Chaim_McDermott@dana.io
+id = 10, name = Clementina DuBuque, email = Rey.Padberg@karina.biz
+```
+
+## function 모듈화
+handler.js가 너무 비대해지는 문제점이 있어, 따로 function은 모듈로 빼서 export하고 handler에서 호출하는 형태로 수정. project의 root 디렉터리에 module 디렉터리 생성.
+
+```shell
+$ mkdir module && cd module
+$ touch db_module.js redis_module.js http_module.js
+```
+
+각 module로 분리합니다. `module.exports = {}` 내부에 function을 담는 코드로의 변화가 필요합니다.
+
+### redis_module.js
+```js
+const redis = require('redis');
+
+// REDIS에 데이터를 set한 후 get하는 예제
+module.exports = {
+  setGetByRedis: () => new Promise((resolve, reject) => {
+    // Redis
+    const redis_client = redis.createClient({
+      host: "localhost",
+      port: 6379
+    });
+    redis_client.set('lambda', 'Hello Lambda', (err, result) => {
+      if (result)
+        console.log("redis-set-result:", result);
+
+      if (err)
+        console.log("redis-set-error:", err);
+    });
+    redis_client.get('lambda', (err, result) => {
+      if (result)
+        resolve(result);
+
+      if (err)
+        console.log("redis-get-error:", err);
+    });
+    redis_client.quit();
+  })
+}
+```
+
+### db_module.js
+```js
+const mysql = require('mysql');
+
+// MYSQL 테이블에서 데이터를 5개 조회하는 예제
+module.exports = {
+  getCommentByDB: () => new Promise((resolve, reject) => {
+    // Mysql
+    const mysql_connection = mysql.createConnection({
+      host: 'localhost',
+      port: 3306,
+      user: 'root',
+      password: 'mypassword',
+      database: 'test_db'
+    });
+
+    mysql_connection.connect();
+    mysql_connection.query('select * from users order by id limit 5', function(err, result, field) {
+        if(result)
+          resolve(result);
+        
+        if(err)
+          console.log("db-error:",err);
+    });
+    mysql_connection.end();
+  })
+}
+```
+
+### http_module.js
+```js
+const http = require('http');
+
+// REST API를 호출하고 결과 JSON을 읽어서 화면에 출력하는 예제
+module.exports = {
+  getUsersByHttp: () => new Promise((resolve, reject) => {
+    const options = {
+      host: 'jsonplaceholder.typicode.com',
+      port: 80,
+      path: '/users',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+    const request = http.request(options, function(response) {
+      let body = '';
+      response.on('data', function(data) {
+        body += data;
+      })
+      response.on('end', function() {
+        resolve(JSON.parse(body));
+      });
+      response.on('error', function(err) {
+        console.log("http-error:",err);
+      }); 
+    });
+    request.end();
+  })
+}
+```
+
+모듈화한 후 handler.js에서 각 모듈을 호출하는 code를 추가하고, 각 function에 대해서도 호출하는 `변수명.함수이름`의 형식으로 code를 수정해줍니다.
+
+### handler.js
+```js
+'use strict';
+
+// 사용할 모듈 선언
+const dbModule = require('./module/db_module');
+const redisModule = require('./module/redis_module');
+const httpModule = require('./module/http_module');
+
+module.exports.hello = async event => {
+  const redisResult = await redisModule.setGetByRedis();
+  console.log("1. REDIS RESULT");
+  console.log(redisResult);
+
+  const dbResult = await dbModule.getCommentByDB();
+  console.log("2. DB RESULT");
+  if(dbResult) {
+    dbResult.forEach(user => {
+      console.log("id = %d, firstname = %s, lastname = %s, email = %s", user.id, user.first_name, user.last_name, user.email);
+    });
+  }
+  
+  const httpResult = await httpModule.getUsersByHttp();
+  console.log("3. HTTP RESULT");
+  if(httpResult) {
+    httpResult.forEach(user => {
+      console.log("id = %d, name = %s, email = %s", user.id, user.name, user.email);
+    });
+  }
+};
+```
+
+다시 local에서 lambda함수를 실행하는 명령어로 정상동작 테스트를합니다.
+```shell
+$ sls invoke local -f hello
 redis-set-result: OK
 1. REDIS RESULT
 Hello Lambda
