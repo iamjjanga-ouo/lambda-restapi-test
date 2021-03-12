@@ -28,6 +28,8 @@
     - [db_module.js](#db_modulejs)
     - [http_module.js](#http_modulejs)
     - [handler.js](#handlerjs)
+  - [여러개의 비동기 함수를 동시에 수행하도록 처리](#여러개의-비동기-함수를-동시에-수행하도록-처리)
+    - [수정된 handler.js](#수정된-handlerjs)
 - [Refs.](#refs)
 
 # Local 개발 환경 설정
@@ -694,6 +696,41 @@ id = 9, name = Glenna Reichert, email = Chaim_McDermott@dana.io
 id = 10, name = Clementina DuBuque, email = Rey.Padberg@karina.biz
 ```
 
+## 여러개의 비동기 함수를 동시에 수행하도록 처리
+기존의 각 모듈은 비동기로 작성되어있고, handler.js에서 호출해서 사용하고 있다. 그런데 호출시 `await`를 사용하면 해당 부분이 처리될때까지 blockin되므로 비효율적이다. 3개의 요청을 한번에 수행하고 결과를 처리할 수 있도록 `Promise.all`을 사용하여 handler.js를 수정.
+
+### 수정된 handler.js
+```js
+'use strict';
+
+// 사용할 모듈 선언
+const dbModule = require('./module/db_module');
+const redisModule = require('./module/redis_module');
+const httpModule = require('./module/http_module');
+
+module.exports.hello = async event => {
+
+  const [redisResult, dbResult, httpResult] = await Promise.all([redisModule.setGetByRedis(), dbModule.getCommentByDB(), httpModule.getUsersByHttp()]);
+  
+  console.log("1. REDIS RESULT");
+  console.log(redisResult);
+
+  console.log("2. DB RESULT");
+  if(dbResult) {
+    dbResult.forEach(user => {
+      console.log("id = %d, firstname = %s, lastname = %s, email = %s", user.id, user.first_name, user.last_name, user.email);
+    });
+  }
+  
+  console.log("3. HTTP RESULT");
+  if(httpResult) {
+    httpResult.forEach(user => {
+      console.log("id = %d, name = %s, email = %s", user.id, user.name, user.email);
+    });
+  }
+};
+```
+동시처리를 하면 이전보다 응답속도를 개선가능하다.
 
 # Refs.
 - [redis container 관련](https://gblee1987.tistory.com/158)
