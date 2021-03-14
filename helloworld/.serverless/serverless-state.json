@@ -8,6 +8,15 @@
       "name": "aws",
       "runtime": "nodejs12.x",
       "lambdaHashingVersion": "20201221",
+      "environment": {
+        "DB_HOST": "localhost",
+        "DB_PORT": "3306",
+        "DB_USER": "root",
+        "DB_PASSWD": "mypassword",
+        "DB_NAME": "test_db",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      },
       "stage": "dev",
       "variableSyntax": "\\${([^{}:]+?(?:\\(|:)(?:[^:{}][^{}]*?)?)}",
       "region": "ap-northeast-2",
@@ -175,13 +184,24 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/helloworld/test/1617773546513-2021-04-07T05:32:26.513Z/helloworld.zip"
+                "S3Key": "serverless/helloworld/test/1617789600683-2021-04-07T10:00:00.683Z/helloworld.zip"
               },
               "Handler": "handler.hello",
               "Runtime": "nodejs12.x",
               "FunctionName": "helloworld-test-hello",
               "MemorySize": 1024,
               "Timeout": 6,
+              "Environment": {
+                "Variables": {
+                  "DB_HOST": "localhost",
+                  "DB_PORT": "3306",
+                  "DB_USER": "root",
+                  "DB_PASSWD": "mypassword",
+                  "DB_NAME": "test_db",
+                  "REDIS_HOST": "localhost",
+                  "REDIS_PORT": "6379"
+                }
+              },
               "Role": {
                 "Fn::GetAtt": [
                   "IamRoleLambdaExecution",
@@ -193,14 +213,14 @@
               "HelloLogGroup"
             ]
           },
-          "HelloLambdaVersionqmqCkVnuUuzmEK25KtUo1Wi31CvJgzT30Vn6mJVM": {
+          "HelloLambdaVersionEi8dtYXTrPAmOdbB19WoXy2UTjZ9MoCnNIFDIn4ucXI": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "HelloLambdaFunction"
               },
-              "CodeSha256": "N2T+ufoquBzhkaDxKjrhdTQ+IHhfQcb5RZdGTSBQ8j0="
+              "CodeSha256": "rxdw7v5u2fxJsoWjRD7D3AU0HA8lYnVv5PPeBKkq6q8="
             }
           },
           "ApiGatewayRestApi": {
@@ -285,7 +305,7 @@
               "MethodResponses": []
             }
           },
-          "ApiGatewayDeployment1617773545232": {
+          "ApiGatewayDeployment1617789598801": {
             "Type": "AWS::ApiGateway::Deployment",
             "Properties": {
               "RestApiId": {
@@ -344,7 +364,7 @@
           "HelloLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "HelloLambdaVersionqmqCkVnuUuzmEK25KtUo1Wi31CvJgzT30Vn6mJVM"
+              "Ref": "HelloLambdaVersionEi8dtYXTrPAmOdbB19WoXy2UTjZ9MoCnNIFDIn4ucXI"
             }
           },
           "ServiceEndpoint": {
@@ -456,6 +476,17 @@
       },
       "vpc": {}
     },
+    "custom": {
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_PORT": 3306,
+        "DB_USER": "root",
+        "DB_PASSWORD": "mypassword",
+        "DB_NAME": "test_db",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": 6379
+      }
+    },
     "pluginsData": {},
     "functions": {
       "hello": {
@@ -475,7 +506,7 @@
         "timeout": 6,
         "runtime": "nodejs12.x",
         "vpc": {},
-        "versionLogicalId": "HelloLambdaVersionqmqCkVnuUuzmEK25KtUo1Wi31CvJgzT30Vn6mJVM"
+        "versionLogicalId": "HelloLambdaVersionEi8dtYXTrPAmOdbB19WoXy2UTjZ9MoCnNIFDIn4ucXI"
       }
     },
     "configValidationMode": "warn",
@@ -486,6 +517,9 @@
         "$ref": "$[\"service\"][\"serviceObject\"]"
       },
       "frameworkVersion": "2",
+      "custom": {
+        "$ref": "$[\"service\"][\"custom\"]"
+      },
       "provider": {
         "$ref": "$[\"service\"][\"provider\"]"
       },
@@ -497,7 +531,7 @@
     "artifact": "/Users/leesihyung/Workspace/serverless/helloworld/.serverless/helloworld.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/helloworld/test/1617773546513-2021-04-07T05:32:26.513Z",
+    "artifactDirectoryName": "serverless/helloworld/test/1617789600683-2021-04-07T10:00:00.683Z",
     "artifact": "helloworld.zip"
   }
 }

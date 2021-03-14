@@ -5,11 +5,11 @@ module.exports = {
   getCommentByDB: () => new Promise((resolve, reject) => {
     // Mysql
     const mysql_connection = mysql.createConnection({
-      host: 'localhost',
-      port: 3306,
-      user: 'root',
-      password: 'mypassword',
-      database: 'test_db'
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWD,
+      database: process.env.DB_NAME
     });
 
     mysql_connection.connect();

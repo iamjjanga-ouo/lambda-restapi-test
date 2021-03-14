@@ -30,6 +30,9 @@
     - [handler.js](#handlerjs)
   - [여러개의 비동기 함수를 동시에 수행하도록 처리](#여러개의-비동기-함수를-동시에-수행하도록-처리)
     - [수정된 handler.js](#수정된-handlerjs)
+  - [환경변수](#환경변수)
+    - [db_module.js](#db_modulejs-1)
+    - [redis_module.js](#redis_modulejs-1)
 - [Refs.](#refs)
 
 # Local 개발 환경 설정
@@ -731,6 +734,79 @@ module.exports.hello = async event => {
 };
 ```
 동시처리를 하면 이전보다 응답속도를 개선가능하다.
+
+## 환경변수
+위의 코드는 로컬 개발환경에 맞춰진 코드이다. 서버에 배포하려는 경우 서버의 환경에 맞게 redis, mysql 등 connection 정보를 변경해야하는 필요가 있다. 해당 정보는 환경(stage)마다 다르기때문에 각각의 환경변수를 적용할 수 있도록 구성한다.
+
+프로젝트 root 디렉터리에 환경변수를 담을 "env" 디렉터리를 생성. 그리고 하위 환경별 json 파일을 생성한다.
+```shell
+$ mkdir env && cd env
+$ touch local.json
+$ touch dev.json
+$ touch proc.json
+```
+
+생성할 파일에 환경변수를 json 형태로 작성한다. 대표적으로 local.json의 환경변수를 설정
+```json
+{
+  "DB_HOST": "localhost",
+  "DB_PORT": 3306,
+  "DB_USER": "root",
+  "DB_PASSWORD": "mypassword",
+  "DB_NAME": "test_db",
+  "REDIS_HOST": "localhost",
+  "REDIS_PORT": 6379
+}
+```
+
+환경변수를 serverless에서 불러올 수 있도록 serverless.yml에 다음 내용을 추가한다. 아래 내용으로 테스트시에 local.json 환경변수를 사용하고, stage 정보(local, dev, prod)에 따라 각각 다른 파일을 사용할 수 있다.  
+
+serverless.yml
+```yaml
+custom:
+  env: ${file(./env/${opt:state,'local'}.json)}
+
+provider:
+  // 생략
+  environment:
+    DB_HOST: ${self:custom.env.DB_HOST}
+    DB_PORT: ${self:custom.env.DB_PORT}
+    DB_USER: ${self:custom.env.DB_USER}
+    DB_PASSWD: ${self:custom.env.DB_PASSWORD}
+    DB_NAME: ${self:custom.env.DB_NAME}
+    REDIS_HOST: ${self:custom.env.REDIS_HOST}
+    REDIS_PORT: ${self:custom.env.REDIS_PORT}
+```
+
+redis와 mysql 모듈에 하드코딩된 connection 정보를 환경변수로 변경한다. 환경변수는 `process.env.[변수명]`으로 사용가능.
+
+### db_module.js
+```js
+getCommentByDB: () => new Promise((resolve, reject) => {
+    // Mysql
+    const mysql_connection = mysql.createConnection({
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWD,
+      database: process.env.DB_NAME
+    });
+    // 생략..
+```
+
+### redis_module.js
+```js
+    // Redis
+    const redis_client = redis.createClient({
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT
+    });
+    // 생략..
+```
+
+`sls invoke local -f hello`를 하면 정상적으로 로컬 환경에서 테스트가 가능하다. `sls deploy`로 서버에 배포하게되면 각 stage 환경에 맞는 json 파일의 내용을 자동으로 환경변수에 등록해준다. 배포 완료 후에 aws console의 lambda 함수 상세화면에 들어가면 아래와 같이 자동으로 등록된 환경변수를 확인 가능하다.
+
+![](https://i.imgur.com/RDLLnCe.png)
 
 # Refs.
 - [redis container 관련](https://gblee1987.tistory.com/158)
