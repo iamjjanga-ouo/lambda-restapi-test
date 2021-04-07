@@ -811,3 +811,8 @@ getCommentByDB: () => new Promise((resolve, reject) => {
 # Refs.
 - [redis container 관련](https://gblee1987.tistory.com/158)
 - [mysql test data & cheat sheet](https://gist.github.com/bradtraversy/c831baaad44343cc945e76c2e30927b3)
+- [serverless docs](https://www.serverless.com/framework/docs/)
+- [npm redis](https://www.npmjs.com/package/redis)
+- [redis - node 연동하기](https://www.zerocho.com/category/NodeJS/post/5a3238b714c5f9001b16c430)
+- [mysql - node 연동하기](https://poiemaweb.com/nodejs-mysql)
+- [aws lambda 개발하기](https://daddyprogrammer.org/post/9131/aws-lambda-setup-develop-environment/)
